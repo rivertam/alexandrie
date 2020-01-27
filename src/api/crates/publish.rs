@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use async_std::io::prelude::*;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use chrono::Utc;
 use diesel::dsl as sql;
 use diesel::prelude::*;
 use flate2::read::GzDecoder;
@@ -170,32 +171,34 @@ pub(crate) async fn put(mut req: Request<State>) -> Result<Response, Error> {
     let transaction = repo.transaction(move |conn| {
         let state = req.state();
 
+        let deps = metadata
+            .deps
+            .into_iter()
+            .map(|dep| {
+                let (name, package) = if let Some(renamed) = dep.explicit_name {
+                    (renamed, Some(dep.name))
+                } else {
+                    (dep.name, None)
+                };
+                CrateDependency {
+                    name,
+                    req: dep.version_req,
+                    features: dep.features,
+                    optional: dep.optional,
+                    default_features: dep.default_features,
+                    target: dep.target,
+                    kind: dep.kind,
+                    registry: dep.registry,
+                    package,
+                }
+            })
+            .collect();
+
         //? Construct a crate description.
         let crate_desc = CrateVersion {
+            deps,
             name: metadata.name,
             vers: metadata.vers,
-            deps: metadata
-                .deps
-                .into_iter()
-                .map(|dep| {
-                    let (name, package) = if let Some(renamed) = dep.explicit_name {
-                        (renamed, Some(dep.name))
-                    } else {
-                        (dep.name, None)
-                    };
-                    CrateDependency {
-                        name,
-                        req: dep.version_req,
-                        features: dep.features,
-                        optional: dep.optional,
-                        default_features: dep.default_features,
-                        target: dep.target,
-                        kind: dep.kind,
-                        registry: dep.registry,
-                        package,
-                    }
-                })
-                .collect(),
             cksum: hash,
             features: metadata.features,
             yanked: Some(false),
@@ -263,16 +266,13 @@ pub(crate) async fn put(mut req: Request<State>) -> Result<Response, Error> {
             let description = metadata.description.as_ref().map(|s| s.as_str());
             let documentation = metadata.documentation.as_ref().map(|s| s.as_str());
             let repository = metadata.repository.as_ref().map(|s| s.as_str());
+            let updated_at = Utc::now().naive_utc().format(DATETIME_FORMAT).to_string();
             diesel::update(crates::table.filter(crates::id.eq(krate.id)))
                 .set((
                     crates::description.eq(description),
                     crates::documentation.eq(documentation),
                     crates::repository.eq(repository),
-                    crates::updated_at.eq(chrono::Utc::now()
-                        .naive_utc()
-                        .format(DATETIME_FORMAT)
-                        .to_string()
-                        .as_str()),
+                    crates::updated_at.eq(updated_at),
                 ))
                 .execute(conn)?;
         } else {
@@ -332,7 +332,7 @@ pub(crate) async fn put(mut req: Request<State>) -> Result<Response, Error> {
             "{0} crate `{1}#{2}`",
             operation,
             crate_desc.name.as_str(),
-            &crate_desc.vers
+            &crate_desc.vers,
         );
         state.index.add_record(crate_desc)?;
         state.index.commit_and_push(commit_msg.as_str())?;

@@ -201,6 +201,9 @@ async fn run() -> Result<(), Error> {
     info!("mounting '/api/v1/crates/new'");
     app.at("/api/v1/crates/new")
         .put(Handler::new(api::publish::put));
+    info!("mounting '/api/v1/crates/suggest'");
+    app.at("/api/v1/crates/suggest")
+        .get(Handler::new(api::suggest::get));
     info!("mounting '/api/v1/crates/:name/owners'");
     app.at("/api/v1/crates/:name/owners")
         .get(Handler::new(api::owners::get))

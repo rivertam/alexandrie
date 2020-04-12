@@ -1,0 +1,25 @@
+[package]
+name = "alexandrie-rendering"
+version = "0.1.0"
+edition = "2018"
+authors = ["Nicolas Polomack <nicolas@polomack.eu>"]
+description = "The markdown rendering library for Alexandrie, an alternative crate registry."
+repository = "https://github.com/Hirevo/alexandrie"
+documentation = "https://crates.polomack.eu/docs/alexandrie"
+keywords = ["crates", "cargo", "web", "registry"]
+categories = ["development-tools"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# data types
+semver = { version = "0.9.0", features = ["serde"] }
+
+# file formats
+serde = { version = "1.0.104", features = ["derive"] }
+
+# error handling
+thiserror = { version = "1.0.9" }
+
+# README rendering
+syntect = { version = "3.3.0" }
+cmark = { package = "pulldown-cmark", version = "0.6.1" }
